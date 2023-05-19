@@ -1,0 +1,17 @@
+{
+	"files.associations": {
+		// "fsl_device_registers.h": "c",
+	},
+	"makefile.configurations": [
+		{
+			"name": "Default",
+			"makeArgs": []
+		},
+		{
+			"name": "Print make version",
+			"makeArgs": ["--version"]
+		}
+	],
+	"makefile.makeDirectory": "",
+	"makefile.launchConfigurations": []
+}
