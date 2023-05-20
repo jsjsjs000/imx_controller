@@ -56,4 +56,6 @@ make
 	or in Visual Studio Code with extension "Makefile Tools":
 Ctrl+Shift+B
 
+gcc main.c uart_commands.c -Wall -Wextra -std=gnu11 -g -Og -o build/imx_controller
+
 */
