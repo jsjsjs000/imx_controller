@@ -39,7 +39,7 @@ int main(void)
 				int cmd_ix = (int)strtol(input, &end, 10);
 				if (input != end && cmd_ix > 0 && cmd_ix <= commands_count)
 				{
-					printf(">: %s\r\n", commands[(int)cmd_ix - 1]);
+					printf("> %s\r\n", commands[(int)cmd_ix - 1]);
 					printf("< 120 (+10 ms)\r\n");
 					//printf("< (+20 ms - timeout - no answer)\r\n");
 				}
