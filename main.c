@@ -87,8 +87,8 @@ void wait_for_any_key(void)
 /*
 
 	to do:
-- time counting
 - port name configuration to config file
+- time counting
 
 	Compile and run:
 make
