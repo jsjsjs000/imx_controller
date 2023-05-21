@@ -2,9 +2,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "uart_commands.h"
+// #include "uart_commands.h"
+
+const int commands_count = 2;
+const char *commands[] = { "add 111 9 -20", "add 111 a 9" };
 
 void print_help(void);
+void wait_for_any_key(void);
 
 int main(void)
 {
@@ -14,19 +18,37 @@ int main(void)
 	while (true)
 	{
 		print_help();
-		// char ch = getchar();
-		// fflush(stdin);
-		// if (ch == '1')
-		// 	printf("a");
-		// else if (ch == '2')
-		// 	printf("b");
 
-		int x = scanf("%s", input);
-		printf("x %d\r\n", x);
-		if (x == 1)
+		printf("Your choice: ");
+		int input_variables_count = scanf("%s", input);
+		printf("\r\n");
+		if (input_variables_count == 1)
 		{
-			printf("%s", input);
+			if (strcmp(input, "u") == 0)
+			{
+
+			}
+			else if (strcmp(input, "q") == 0)
+			{
+				printf("Bye.\r\n");
+				return 0;
+			}
+			else
+			{
+				char *end;
+				int cmd_ix = (int)strtol(input, &end, 10);
+				if (input != end && cmd_ix > 0 && cmd_ix <= commands_count)
+				{
+					printf(">: %s\r\n", commands[(int)cmd_ix - 1]);
+					printf("< 120 (+10 ms)\r\n");
+					//printf("< (+20 ms - timeout - no answer)\r\n");
+				}
+			}
 		}
+
+		printf("\r\n");
+
+		wait_for_any_key();
 	}
 
 	// char result[1024] = { 0 };
@@ -45,11 +67,28 @@ int main(void)
 void print_help(void)
 {
 	printf("Press:\r\n");
-	printf("[1] Send \"add 111 9 -20\"\r\n");
-	printf("[2] Send \"add 111 a 9\"\r\n");
+	for (int i = 0; i < commands_count; i++)
+	{
+		printf("[%d] Send \"%s\"\r\n", i + 1, commands[i]);
+	}
+	printf("[u] Set UART name - current: /dev/ttyUSB1\r\n");
+	printf("[q] Quit program.\r\n");
+}
+
+void wait_for_any_key(void)
+{
+#ifdef __unix__
+	system("read");
+#else
+	system("pause");
+#endif
 }
 
 /*
+
+	to do:
+- time counting
+- port name configuration to config file
 
 	Compile and run:
 make
