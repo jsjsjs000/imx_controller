@@ -10,7 +10,7 @@
 #define Read_Buffer_Count 10240
 
 const int Commands_Count = 2;
-const char *Commands[] = { "add 111 9 -20", "add 111 a 9" };
+const char *Commands[] = { "add 111 9 -20\r\n", "add 111 a 9\r\n" };
 
 static char *uart_port_name = "/dev/ttyUSB1";
 static char read_buffer[1024];
@@ -58,6 +58,7 @@ int main(void)
 					if (receive_ok)
 					{
 						printf("< %s", read_buffer);
+printf("count %d\r\n", read_count);
 						printf("(+%.1f ms)\r\n", read_time_us / 1000.0);
 					}
 					else if (!receive_ok && timeout)
