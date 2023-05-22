@@ -5,6 +5,7 @@
 #include <string.h>
 #include <time.h>
 #include "uart_port.h"
+#include "configuration.h"
 // #include "uart_commands.h"
 
 #define Read_Buffer_Count 10240
@@ -12,8 +13,9 @@
 const int Commands_Count = 2;
 const char *Commands[] = { "add 111 9 -20\r\n", "add 111 a 9\r\n" };
 
-static char *uart_port_name = "/dev/ttyUSB1";
+//static char *uart_port_name = "/dev/ttyUSB1";
 static char read_buffer[1024];
+static configuration_t configuration;
 
 static void print_help(void);
 static void wait_for_any_key(void);
@@ -21,6 +23,13 @@ static void wait_for_any_key(void);
 int main(void)
 {
 	printf("i.MX Cortex-M7 controller.\r\n\r\n");
+
+// configuration.uart_port_name = "/dev/pts/1";
+// configuration_save(&configuration); // $$
+
+	configuration.uart_port_name = "/dev/ttyUSB1";
+	configuration_load(&configuration); // $$
+printf("serial port: %s\n", configuration.uart_port_name); // $$
 
 	char input[1024];
 	while (true)
@@ -52,7 +61,7 @@ int main(void)
 					int read_count;
 					bool timeout;
 					int read_time_us;
-					bool receive_ok = send_and_receive_to_uart(uart_port_name, Commands[(int)cmd_ix - 1],
+					bool receive_ok = send_and_receive_to_uart(configuration.uart_port_name, Commands[(int)cmd_ix - 1],
 							strlen(Commands[(int)cmd_ix - 1]), read_buffer, Read_Buffer_Count, &read_count,
 							&timeout, &read_time_us);
 					if (receive_ok)
@@ -94,7 +103,7 @@ static void print_help(void)
 	{
 		printf("[%d] Send \"%s\"\r\n", i + 1, Commands[i]);
 	}
-	printf("[u] Set UART name - current: /dev/ttyUSB1\r\n");
+	printf("[u] Set UART name - current: %s\r\n", configuration.uart_port_name);
 	printf("[q] Quit program.\r\n");
 }
 
@@ -121,6 +130,12 @@ make
 	or in Visual Studio Code with extension "Makefile Tools":
 Ctrl+Shift+B
 
-gcc main.c uart_commands.c -Wall -Wextra -std=gnu11 -g -Og -o build/imx_controller
+gcc main.c uart_commands.c uart_port.c configuration.c -Wall -Wextra -std=gnu11 -g -Og -o build/imx_controller
+
+	Connected Virtual Serial Ports with echo on Linux
+socat -d -d pty,raw,echo=0 pty,raw,echo=0
+cat < /dev/pts/1
+echo "Test" > /dev/pts/2
+# socat PTY,link=/dev/ttyS10 PTY,link=/dev/ttyS11
 
 */

@@ -20,9 +20,9 @@ all: clean build run
 .PHONY: clean
 clean:
 ifdef OS
-	@if exist $(BUILD_PATH) rmdir /s /q $(BUILD_PATH)
+	@del $(BUILD_PATH)/imx_controller.exe
 else
-	@rm -rf $(BUILD_PATH)
+	@rm -f $(BUILD_PATH)/imx_controller
 endif
 
 .PHONY: build
@@ -32,7 +32,7 @@ ifdef OS
 else
 	@mkdir -p $(BUILD_PATH)
 endif
-	@$(CC) main.c uart_commands.c uart_port.c $(CFLAGS) -o build/imx_controller
+	@$(CC) main.c uart_commands.c uart_port.c configuration.c $(CFLAGS) -o build/imx_controller
 
 .PHONY: run
 run:

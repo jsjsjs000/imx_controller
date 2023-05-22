@@ -24,11 +24,11 @@ bool send_and_receive_to_uart(char *uart_port_name, const char *send, int send_c
 	int f = open(uart_port_name, O_RDWR); // | O_NOCTTY
 	if (f < 0)
 	{
-		printf("Can't open port %s", uart_port_name);
+		printf("Can't open port %s\r\n", uart_port_name);
 		perror(uart_port_name);
-		printf("if you do'nt have permissions to %s type it in terminal:", uart_port_name);
-		printf("sudo gpasswd --add ${USER} dialout");
-		printf("and relogin.");
+		printf("if you don't have permissions to %s type it in terminal:\r\n", uart_port_name);
+		printf("sudo gpasswd --add ${USER} dialout\r\n");
+		printf("and relogin.\r\n");
 		return false;
 	}
 
@@ -47,7 +47,7 @@ bool send_and_receive_to_uart(char *uart_port_name, const char *send, int send_c
 		int wrote_count_ = write(f, &send[wrote_count], 1); // $$ 1
 		if (wrote_count_ < 0)
 		{
-			printf("Can't write to %s", uart_port_name);
+			printf("Can't write to %s\r\n", uart_port_name);
 			perror(uart_port_name);
 			close(f);
 			return false;
@@ -58,7 +58,7 @@ bool send_and_receive_to_uart(char *uart_port_name, const char *send, int send_c
 	
 	// if (write(f, "\r\n", 2) < 0)
 	// {
-	// 	printf("Can't write to %s", uart_port_name);
+	// 	printf("Can't write to %s\r\n", uart_port_name);
 	// 	perror(uart_port_name);
 	// 	close(f);
 	// 	return false;
@@ -76,7 +76,7 @@ bool send_and_receive_to_uart(char *uart_port_name, const char *send, int send_c
 		{
 			// if (*read_count + read_available >= read_buffer_size)
 			// {
-			// 	printf("UART try read buffer overlow (%d bytes).", read_buffer_size);
+			// 	printf("UART try read buffer overlow (%d bytes).\r\n", read_buffer_size);
 			// 	close(f);
 			// 	return false;
 			// }
@@ -84,7 +84,7 @@ bool send_and_receive_to_uart(char *uart_port_name, const char *send, int send_c
 			int read_count_ = read(f, &read_buffer[*read_count], read_buffer_size - *read_count);
 			if (read_count_ < 0)
 			{
-				printf("Can't read from %s", uart_port_name);
+				printf("Can't read from %s\r\n", uart_port_name);
 				perror(uart_port_name);
 				close(f);
 				return false;
@@ -94,7 +94,7 @@ bool send_and_receive_to_uart(char *uart_port_name, const char *send, int send_c
 				*read_count += read_count_;
 				if (*read_count >= read_buffer_size)
 				{
-					printf("UART try read buffer overlow (%d bytes).", read_buffer_size);
+					printf("UART try read buffer overlow (%d bytes).\r\n", read_buffer_size);
 					close(f);
 					return false;
 				}
