@@ -10,15 +10,18 @@
 #include <sys/ioctl.h>
 #include <sys/time.h>
 
-const int Read_Buffer_Count = 10240;
-
-static char *uart_port_name = "/dev/ttyUSB1";
+static const int Timeout = 50;
 
 static bool uart_port_set_parameters(int f);
 
-bool send_and_receive_to_uart(const char *send, int send_count)
+bool send_and_receive_to_uart(char *uart_port_name, const char *send, int send_count,
+		char *read_buffer, int read_buffer_size, int *read_count, bool *timeout, int *read_time_us)
 {
-	int f = open(uart_port_name, O_RDWR | O_NOCTTY); // $$ O_NONBLOCK
+	*read_count = 0;
+	*timeout = false;
+	*read_time_us = 0;
+
+	int f = open(uart_port_name, O_RDWR | O_NOCTTY);
 	if (f < 0)
 	{
 		printf("Can't open port %s", uart_port_name);
@@ -31,9 +34,13 @@ bool send_and_receive_to_uart(const char *send, int send_count)
 
 	if (!uart_port_set_parameters(f))
 	{
+		printf("Error set UART parameters.\r\n");
+		perror(uart_port_name);
+		close(f);
 		return false;
 	}
 
+		// write to UART
 	int wrote_count = 0;
 	do
 	{
@@ -42,6 +49,7 @@ bool send_and_receive_to_uart(const char *send, int send_count)
 		{
 			printf("Can't write to %s", uart_port_name);
 			perror(uart_port_name);
+			close(f);
 			return false;
 		}
 		wrote_count += wrote_count_;
@@ -52,50 +60,64 @@ bool send_and_receive_to_uart(const char *send, int send_count)
 	{
 		printf("Can't write to %s", uart_port_name);
 		perror(uart_port_name);
+		close(f);
 		return false;
 	}
 
-	long time_long;
+		// read from UART
 	struct timeval start_tv, end_tv;
 	gettimeofday(&start_tv, NULL);
 
-	int read_count = 0;
-	char read_buffer[Read_Buffer_Count];
+	int read_available;
 	do
 	{
-		int read_count_ = read(f, &read_buffer[read_count], 1);
-		if (read_count_ < 0)
+		ioctl(f, FIONREAD, &read_available);
+		if (read_available > 0)
 		{
-			printf("Can't read from %s", uart_port_name);
-			perror(uart_port_name);
-			return false;
+			if (*read_count + read_available >= read_buffer_size)
+			{
+				printf("UART try read buffer overlow (%d bytes).", read_buffer_size);
+				close(f);
+				return false;
+			}
+
+			int read_count_ = read(f, &read_buffer[*read_count], read_available);
+			if (read_count_ < 0)
+			{
+				printf("Can't read from %s", uart_port_name);
+				perror(uart_port_name);
+				close(f);
+				return false;
+			}
+			else if (read_count_ > 0)
+			{
+				*read_count += read_count_;
+			}
 		}
-		else if (read_count_ > 0)
+		else
 		{
-			read_count += read_count_;
+			usleep(1000);
 		}
 
 		gettimeofday(&end_tv, NULL);
-		time_long = (end_tv.tv_sec - start_tv.tv_sec) * 1000000 +		// in microseconds
+		*read_time_us = (end_tv.tv_sec - start_tv.tv_sec) * 1000000 +		// in microseconds
 				(end_tv.tv_usec - start_tv.tv_usec);
-		if (time_long >= 50 * 1000)
+		if (*read_time_us >= Timeout * 1000)
 		{
+			*timeout = true;
 			break;
 		}
 	}
-	while (read_buffer[read_count - 1] != '\n');
-	read_buffer[read_count] = 0;
+	while (read_buffer[*read_count - 1] != '\n');
+	read_buffer[*read_count] = 0;
 
 	gettimeofday(&end_tv, NULL);
 
-printf("< %s", read_buffer);
-
-	time_long = (end_tv.tv_sec - start_tv.tv_sec) * 1000000 +		// in microseconds
+	*read_time_us = (end_tv.tv_sec - start_tv.tv_sec) * 1000000 +		// in microseconds
 			(end_tv.tv_usec - start_tv.tv_usec);
-	printf("(+%.1f ms)\r\n", time_long / 1000.0);
 
 	close(f);
-	return true;
+	return !(*timeout);
 }
 
 static bool uart_port_set_parameters(int f)
@@ -104,8 +126,6 @@ static bool uart_port_set_parameters(int f)
 	memset(&tty, 0, sizeof(tty));
 	if (tcgetattr(f, &tty) != 0)
 	{
-		printf("Error set UART parameters.\r\n");
-		perror(uart_port_name);
 		return false;
 	}
 
@@ -118,8 +138,8 @@ static bool uart_port_set_parameters(int f)
 	tty.c_cflag     |=  CS8;
 
 	tty.c_cflag     &=  ~CRTSCTS;           // no flow control
-	tty.c_cc[VMIN]   =  1;                  // read doesn't block
-	tty.c_cc[VTIME]  =  5;                  // 0.5 seconds read timeout
+	tty.c_cc[VMIN]   =  0;
+	tty.c_cc[VTIME]  =  0;
 	tty.c_cflag     |=  CREAD | CLOCAL;     // turn on READ & ignore ctrl lines
 
 	cfmakeraw(&tty);
@@ -127,10 +147,15 @@ static bool uart_port_set_parameters(int f)
 	tcflush(f, TCIFLUSH);
 	if (tcsetattr(f, TCSANOW, &tty) != 0)
 	{
-		printf("Error set UART parameters.\r\n");
-		perror(uart_port_name);
 		return false;
 	}
 
 	return true;
 }
+
+/*
+
+	UART:
+https://blog.mbedded.ninja/programming/operating-systems/linux/linux-serial-ports-using-c-cpp/#getting-the-number-of-rx-bytes-available
+
+*/

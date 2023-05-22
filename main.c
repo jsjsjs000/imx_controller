@@ -7,8 +7,13 @@
 #include "uart_port.h"
 // #include "uart_commands.h"
 
+#define Read_Buffer_Count 10240
+
 const int Commands_Count = 2;
 const char *Commands[] = { "add 111 9 -20", "add 111 a 9" };
+
+static char *uart_port_name = "/dev/ttyUSB1";
+static char read_buffer[1024];
 
 static void print_help(void);
 static void wait_for_any_key(void);
@@ -43,16 +48,22 @@ int main(void)
 				if (input != end && cmd_ix > 0 && cmd_ix <= Commands_Count)
 				{
 					printf("> %s\r\n", Commands[(int)cmd_ix - 1]);
-					if (send_and_receive_to_uart(Commands[(int)cmd_ix - 1], strlen(Commands[(int)cmd_ix - 1])))
-					{
 
-					}
-					else
+					int read_count;
+					bool timeout;
+					int read_time_us;
+					bool receive_ok = send_and_receive_to_uart(uart_port_name, Commands[(int)cmd_ix - 1],
+							strlen(Commands[(int)cmd_ix - 1]), read_buffer, Read_Buffer_Count, &read_count,
+							&timeout, &read_time_us);
+					if (receive_ok)
 					{
-						 
+						printf("< %s", read_buffer);
+						printf("(+%.1f ms)\r\n", read_time_us / 1000.0);
 					}
-					//printf("< 120 (+10 ms)\r\n");
-					//printf("< (+20 ms - timeout - no answer)\r\n");
+					else if (!receive_ok && timeout)
+					{
+						printf("< (read timeout +%.1f ms)\r\n", read_time_us / 1000.0);
+					}
 				}
 			}
 		}
