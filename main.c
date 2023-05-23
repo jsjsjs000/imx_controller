@@ -16,6 +16,7 @@ static char read_buffer[1024];
 static configuration_t configuration;
 
 static void command_send_command(char *input);
+static void command_custom_packet(void);
 static void command_change_uart_name(void);
 static void print_help(void);
 static void wait_for_any_key(void);
@@ -37,7 +38,11 @@ int main(void)
 		printf("\r\n");
 		if (input_variables_count == 1)
 		{
-			if (strcmp(input, "u") == 0)
+			if (strcmp(input, "p") == 0)
+			{
+				command_custom_packet();
+			}
+			else if (strcmp(input, "u") == 0)
 			{
 				command_change_uart_name();
 			}
@@ -84,6 +89,35 @@ static void command_send_command(char *input)
 	}
 }
 
+static void command_custom_packet(void)
+{
+	printf("Send custom packet: ");
+	while (getchar() != '\n') ;
+	
+	char *input = NULL;//[1024];
+	size_t input_length;
+	if (getline(&input, &input_length, stdin) > 0)
+	{
+		printf("> %s\r\n", input);
+
+		int read_count;
+		bool timeout;
+		int read_time_us;
+		bool receive_ok = send_and_receive_to_uart(configuration.uart_port_name, input,
+				strlen(input), read_buffer, Read_Buffer_Count, &read_count,
+				&timeout, &read_time_us);
+		if (receive_ok)
+		{
+			printf("< %s", read_buffer);
+			printf("(+%.1f ms)\r\n", read_time_us / 1000.0);
+		}
+		else if (!receive_ok && timeout)
+		{
+			printf("< (read timeout +%.1f ms)\r\n", read_time_us / 1000.0);
+		}
+	}
+}
+
 static void command_change_uart_name(void)
 {
 	char input[1024];
@@ -102,6 +136,7 @@ static void print_help(void)
 	{
 		printf("[%d] Send \"%s\"\r\n", i + 1, Commands[i]);
 	}
+	printf("[p] Send custom packet.\r\n");
 	printf("[u] Set UART name - current: %s\r\n", configuration.uart_port_name);
 	printf("[q] Quit program.\r\n");
 }
