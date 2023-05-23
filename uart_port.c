@@ -10,7 +10,7 @@
 #include <sys/ioctl.h>
 #include <sys/time.h>
 
-static const int Timeout = 50;
+static const int Timeout_MS = 50;
 
 static bool uart_port_set_parameters(int f);
 
@@ -44,7 +44,7 @@ bool send_and_receive_to_uart(char *uart_port_name, const char *send, int send_c
 	int wrote_count = 0;
 	do
 	{
-		int wrote_count_ = write(f, &send[wrote_count], 1); // $$ 1
+		int wrote_count_ = write(f, &send[wrote_count], send_count);
 		if (wrote_count_ < 0)
 		{
 			printf("Can't write to %s\r\n", uart_port_name);
@@ -56,13 +56,13 @@ bool send_and_receive_to_uart(char *uart_port_name, const char *send, int send_c
 	}
 	while (wrote_count < send_count);
 	
-	// if (write(f, "\r\n", 2) < 0)
-	// {
-	// 	printf("Can't write to %s\r\n", uart_port_name);
-	// 	perror(uart_port_name);
-	// 	close(f);
-	// 	return false;
-	// }
+	if (write(f, "\r\n", 2) < 0)
+	{
+		printf("Can't write to %s\r\n", uart_port_name);
+		perror(uart_port_name);
+		close(f);
+		return false;
+	}
 
 		// read from UART
 	struct timeval start_tv, end_tv;
@@ -112,7 +112,7 @@ bool send_and_receive_to_uart(char *uart_port_name, const char *send, int send_c
 		gettimeofday(&end_tv, NULL);
 		*read_time_us = (end_tv.tv_sec - start_tv.tv_sec) * 1000000 +		// in microseconds
 				(end_tv.tv_usec - start_tv.tv_usec);
-		if (*read_time_us >= Timeout * 1000)
+		if (*read_time_us >= Timeout_MS * 1000)
 		{
 			*timeout = true;
 			break;
