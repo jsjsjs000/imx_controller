@@ -13,7 +13,6 @@
 const int Commands_Count = 2;
 const char *Commands[] = { "add 111 9 -20\r\n", "add 111 a 9\r\n" };
 
-//static char *uart_port_name = "/dev/ttyUSB1";
 static char read_buffer[1024];
 static configuration_t configuration;
 
@@ -24,12 +23,8 @@ int main(void)
 {
 	printf("i.MX Cortex-M7 controller.\r\n\r\n");
 
-// configuration.uart_port_name = "/dev/pts/1";
-// configuration_save(&configuration); // $$
-
-	configuration.uart_port_name = "/dev/ttyUSB1";
-	configuration_load(&configuration); // $$
-printf("serial port: %s\n", configuration.uart_port_name); // $$
+	configuration_initialize(&configuration);
+	configuration_load(&configuration);
 
 	char input[1024];
 	while (true)
@@ -43,7 +38,12 @@ printf("serial port: %s\n", configuration.uart_port_name); // $$
 		{
 			if (strcmp(input, "u") == 0)
 			{
-
+				printf("UART name: ");
+				if (scanf("%s", input) > 0)
+				{
+					configuration_set_uart_name(&configuration, input);
+					configuration_save(&configuration);
+				}
 			}
 			else if (strcmp(input, "q") == 0)
 			{

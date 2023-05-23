@@ -9,6 +9,14 @@
 #include "configuration.h"
 
 const char *Config_Filename = "configuration.cfg";
+const char *Default_Uart_Port_Name = "/dev/ttyUSB1";
+
+void configuration_initialize(configuration_t *cfg)
+{
+	char *uart = calloc(1, strlen(Default_Uart_Port_Name) + 1);
+	strncpy(uart, Default_Uart_Port_Name, strlen(Default_Uart_Port_Name));
+	cfg->uart_port_name = uart;
+}
 
 bool configuration_load(configuration_t *cfg)
 {
@@ -29,9 +37,10 @@ bool configuration_load(configuration_t *cfg)
 
 	if (read_count > 0)
 	{
-		char *s = calloc(1, read_count + 1);
-		strncpy(s, buffer, read_count);
-		cfg->uart_port_name = s;
+		free(cfg->uart_port_name);
+		char *uart = calloc(1, read_count + 1);
+		strncpy(uart, buffer, read_count);
+		cfg->uart_port_name = uart;
 	}
 
 	close(f);
@@ -40,7 +49,6 @@ bool configuration_load(configuration_t *cfg)
 
 bool configuration_save(configuration_t *cfg)
 {
-	//int f = open(Config_Filename, O_RDWR);//O_CREAT | O_TRUNC | O_RDWR); // $$
 	int f = creat(Config_Filename, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 	if (f < 0)
 	{
@@ -55,4 +63,10 @@ bool configuration_save(configuration_t *cfg)
 
 	close(f);
 	return true;
+}
+
+void configuration_set_uart_name(configuration_t *cfg, char *uart_name)
+{
+	free(cfg->uart_port_name);
+	cfg->uart_port_name = uart_name;
 }
