@@ -32,7 +32,7 @@ ifdef OS
 else
 	@mkdir -p $(BUILD_PATH)
 endif
-	@$(CC) main.c uart_commands.c uart_port.c configuration.c $(CFLAGS) -o build/imx_controller
+	@$(CC) main.c uart_commands.c uart_communication.c uart_port.c uart_thread.c common.c configuration.c $(CFLAGS) -o build/imx_controller
 
 .PHONY: run
 run:

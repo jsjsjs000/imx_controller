@@ -4,22 +4,21 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "uart_port.h"
+#include <unistd.h>
+#include "common.h"
 #include "configuration.h"
+#include "uart_communication.h"
+#include "uart_port.h"
+#include "uart_thread.h"
 
-#define Read_Buffer_Count 10240
+volatile bool state_changed = true;
+configuration_t configuration;
 
-const int Commands_Count = 2;
-const char *Commands[] = { "add 111 9 -20", "add 111 a 9" };
-
-static char read_buffer[1024];
-static configuration_t configuration;
-
-static void command_send_command(char *input);
-static void command_custom_packet(void);
-static void command_change_uart_name(void);
+// static void command_custom_packet(void);
+// static void command_change_uart_name(void);
 static void print_help(void);
-static void wait_for_any_key(void);
+// static void wait_for_any_key(void);
+static char* i2c_get_led_status(uint8_t value);
 
 int main(void)
 {
@@ -28,154 +27,192 @@ int main(void)
 	configuration_initialize(&configuration);
 	configuration_load(&configuration);
 
-	char input[1024];
+	if (!open_uart(configuration.uart_port_name))
+		return 1;
+
+	if (!uart_thread_initialize())
+		return 1;
+
+	printf("\033[s");
+
 	while (true)
 	{
-		print_help();
-
-		printf("Your choice: ");
-		int input_variables_count = scanf("%s", input);
-		printf("\r\n");
-		if (input_variables_count == 1)
+		if (state_changed)
 		{
-			if (strcmp(input, "p") == 0)
+				/// https://tldp.org/HOWTO/Bash-Prompt-HOWTO/x361.html
+			printf("\033[u");
+			print_help();
+			fflush(stdout);
+			state_changed = false;
+		}
+
+		int c = getch_non_blocking();
+		if (c)
+		{
+			printf("\b      \r");
+			state_changed = true;
+
+			if (c == '1')
 			{
-				command_custom_packet();
+				enqueue_command_send_leds_states(max(led_r - 1, 0), led_g, led_b);
 			}
-			else if (strcmp(input, "u") == 0)
+			else if (c == '2')
 			{
-				command_change_uart_name();
+				enqueue_command_send_leds_states(min(led_r + 1, LED_COMMAND_LIGHT_100), led_g, led_b);
 			}
-			else if (strcmp(input, "q") == 0)
+			else if (c == '3')
 			{
-				printf("Bye.\r\n");
+				enqueue_command_send_leds_states(led_r, max(led_g - 1, 0), led_b);
+			}
+			else if (c == '4')
+			{
+				enqueue_command_send_leds_states(led_r, min(led_g + 1, LED_COMMAND_LIGHT_100), led_b);
+			}
+			else if (c == '5')
+			{
+				enqueue_command_send_leds_states(led_r, led_g, max(led_b - 1, 0));
+			}
+			else if (c == '6')
+			{
+				enqueue_command_send_leds_states(led_r, led_g, min(led_b + 1, LED_COMMAND_LIGHT_100));
+			}
+			else if (c == 'a')
+			{
+				enqueue_command_send_leds_mode((led_mode == LED_MODE_AUTO) ? LED_MODE_MANUAL : LED_MODE_AUTO);
+			}
+			// else if (c == 'p')
+			// {
+			// 	command_custom_packet();
+			// }
+			// else if (c == 'u')
+			// {
+			// 	command_change_uart_name();
+			// }
+			else if (c == 'q')
+			{
+				printf("\r\nBye.\r\n");
+				close_uart();
 				return 0;
 			}
-			else
-			{
-				command_send_command(input);
-			}
+			// else
+			// {
+			//char input[1024];
+			// 	command_send_command(input);
+			// }
 		}
 
-		printf("\r\n");
-
-		wait_for_any_key();
+		usleep(10 * 1000); /// sleep 10 ms
 	}
+
+	if (!uart_thread_destroy())
+		return 1;
+
+	return 0;
 }
 
-static void command_send_command(char *input)
-{
-	char *end;
-	int cmd_ix = (int)strtol(input, &end, 10);
-	if (input != end && cmd_ix > 0 && cmd_ix <= Commands_Count)
-	{
-		printf("> %s\r\n", Commands[(int)cmd_ix - 1]);
+// static void command_send_command(char *input)
+// {
+// 	char *end;
+// 	int cmd_ix = (int)strtol(input, &end, 10);
+// 	if (input != end && cmd_ix > 0 && cmd_ix <= Commands_Count)
+// 	{
+// 		printf("> %s\r\n", Commands[(int)cmd_ix - 1]);
 
-		int read_count;
-		bool timeout;
-		int read_time_us;
-		bool receive_ok = send_and_receive_to_uart(configuration.uart_port_name, Commands[(int)cmd_ix - 1],
-				strlen(Commands[(int)cmd_ix - 1]), read_buffer, Read_Buffer_Count, &read_count,
-				&timeout, &read_time_us);
-		if (receive_ok)
-		{
-			printf("< %s", read_buffer);
-			printf("(+%.1f ms)\r\n", read_time_us / 1000.0);
-		}
-		else if (!receive_ok && timeout)
-		{
-			printf("< (read timeout +%.1f ms)\r\n", read_time_us / 1000.0);
-		}
-	}
-}
+// 		int read_count;
+// 		bool timeout;
+// 		int read_time_us;
+// 		bool receive_ok = send_and_receive_to_uart(configuration.uart_port_name, Commands[(int)cmd_ix - 1],
+// 				strlen(Commands[(int)cmd_ix - 1]), read_buffer, READ_BUFFER_COUNT, &read_count,
+// 				&timeout, &read_time_us);
+// 		if (receive_ok)
+// 		{
+// 			printf("< %s", read_buffer);
+// 			printf("(+%.1f ms)\r\n", read_time_us / 1000.0);
+// 		}
+// 		else if (!receive_ok && timeout)
+// 		{
+// 			printf("< (read timeout +%.1f ms)\r\n", read_time_us / 1000.0);
+// 		}
+// 	}
+// }
 
-static void command_custom_packet(void)
-{
-	printf("Send custom packet: ");
-	while (getchar() != '\n') ;
+// static void command_custom_packet(void)
+// {
+// 	printf("Send custom packet: ");
+// 	while (getchar() != '\n') ;
 	
-	char *input = NULL;//[1024];
-	size_t input_length;
-	if (getline(&input, &input_length, stdin) > 0)
-	{
-		printf("> %s\r\n", input);
+// 	char *input = NULL;//[1024];
+// 	size_t input_length;
+// 	if (getline(&input, &input_length, stdin) > 0)
+// 	{
+// 		printf("> %s\r\n", input);
 
-		int read_count;
-		bool timeout;
-		int read_time_us;
-		bool receive_ok = send_and_receive_to_uart(configuration.uart_port_name, input,
-				strlen(input), read_buffer, Read_Buffer_Count, &read_count,
-				&timeout, &read_time_us);
-		if (receive_ok)
-		{
-			printf("< %s", read_buffer);
-			printf("(+%.1f ms)\r\n", read_time_us / 1000.0);
-		}
-		else if (!receive_ok && timeout)
-		{
-			printf("< (read timeout +%.1f ms)\r\n", read_time_us / 1000.0);
-		}
-	}
-}
+// 		int read_count;
+// 		bool timeout;
+// 		int read_time_us;
+// 		bool receive_ok = send_and_receive_to_uart(configuration.uart_port_name, input,
+// 				strlen(input), read_buffer, READ_BUFFER_COUNT, &read_count,
+// 				&timeout, &read_time_us);
+// 		if (receive_ok)
+// 		{
+// 			printf("< %s", read_buffer);
+// 			printf("(+%.1f ms)\r\n", read_time_us / 1000.0);
+// 		}
+// 		else if (!receive_ok && timeout)
+// 		{
+// 			printf("< (read timeout +%.1f ms)\r\n", read_time_us / 1000.0);
+// 		}
+// 	}
+// }
 
-static void command_change_uart_name(void)
-{
-	char input[1024];
-	printf("UART name: ");
-	if (scanf("%s", input) > 0)
-	{
-		configuration_set_uart_name(&configuration, input);
-		configuration_save(&configuration);
-	}
-}
+// static void command_change_uart_name(void)
+// {
+// 	char input[1024];
+// 	printf("UART name: ");
+// 	if (scanf("%s", input) > 0)
+// 	{
+// 		configuration_set_uart_name(&configuration, input);
+// 		configuration_save(&configuration);
+// 	}
+// }
 
 static void print_help(void)
 {
-	printf("Press:\r\n");
-	for (int i = 0; i < Commands_Count; i++)
+	printf("[1/2] LED Red:   %s  \r\n", i2c_get_led_status(led_r));
+	printf("[3/4] LED Green: %s  \r\n", i2c_get_led_status(led_g));
+	printf("[5/6] LED Blue:  %s  \r\n", i2c_get_led_status(led_b));
+	printf("[a]   Auto mode: %s  \r\n", (led_mode == LED_MODE_AUTO) ? "on " : "off");
+	// $$ printf("[u]   Set UART name - current: %s\r\n", configuration.uart_port_name);
+	printf("[q]   Quit program.\r\n");
+	if (strlen(communication_log1) > 0)
 	{
-		printf("[%d] Send \"%s\"\r\n", i + 1, Commands[i]);
+		printf("\r                                       \r\n");
+		printf("                                         \r%s", communication_log1);
+		printf("                                         \r%s", communication_log2);
+		printf("                                         \r%s", communication_log3);
 	}
-	printf("[p] Send custom packet.\r\n");
-	printf("[u] Set UART name - current: %s\r\n", configuration.uart_port_name);
-	printf("[q] Quit program.\r\n");
+	printf("Press suitable key: ");
 }
 
-static void wait_for_any_key(void)
+static char* i2c_get_led_status(uint8_t value)
 {
-#ifdef __unix__
-	printf("Press ENTER to continue...");
-	while (getchar() != '\n') ;
-	getchar();
-#else
-	system("pause");
-#endif
+	switch (value)
+	{
+		case LED_COMMAND_OFF:       return "  0%";
+		case LED_COMMAND_LIGHT_25:  return " 25%";
+		case LED_COMMAND_LIGHT_50:  return " 50%";
+		case LED_COMMAND_LIGHT_100: return "100%";
+	}
+	return "undef";
 }
 
-/*
-
-	Compile and run:
-make
-	or in Visual Studio Code with extension "Makefile Tools":
-Ctrl+Shift+B
-
-gcc main.c uart_commands.c uart_port.c configuration.c -Wall -Wextra -std=gnu11 -g -Og -o build/imx_controller
-
-	Connected Virtual Serial Ports with echo on Linux
-socat -d -d pty,raw,echo=0 pty,raw,echo=0
-cat < /dev/pts/1
-echo "Test" > /dev/pts/2
-# socat PTY,link=/dev/ttyS10 PTY,link=/dev/ttyS11
-
-	tests:
-// char result[1024] = { 0 };
-
-// char s1[] = "add 123 a 432\r\n";
-// if (parse_line(s1, result))
-// 	printf("%s\r\n", result);
-
-// char s2[] = "subtract 1234 4 30\r\n";
-// if (parse_line(s2, result))
-// 	printf("%s\r\n", result);
-
-*/
+// static void wait_for_any_key(void)
+// {
+// #ifdef __unix__
+// 	printf("Press ENTER to continue...");
+// 	while (getchar() != '\n') ;
+// 	getchar();
+// #else
+// 	system("pause");
+// #endif
+// }

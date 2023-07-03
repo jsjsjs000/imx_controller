@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#include "uart_communication.h"
+#include "main.h"
 
 #define words_max_count 32
 const char delimiter[] = " ";
@@ -63,42 +65,34 @@ static bool parse_parameters(char *words[], int words_count)
 	return true;
 }
 
-static void execute_commands(const char *command, char *result)
+static bool execute_commands(const char *command, char *result)
 {
 	int command_length = strlen(command);
 	if (command_length <= 0)
 	{
 		strcpy(result, "error");
-		return;
+		return false;
 	}
 
-	if (strcmp("add", command) == 0)
+	if (strcmp("leds_status", command) == 0 && parameters_count == 4)
 	{
-		int value = 0;
-		for (int i = 0; i < parameters_count; i++)
+		int8_t r = parameters[0];
+		int8_t g = parameters[1];
+		int8_t b = parameters[2];
+		enum led_mode_t mode = (parameters[3] == 1) ? LED_MODE_AUTO : LED_MODE_MANUAL;
+		if (r != led_r || g != led_g || b != led_b || mode != led_mode)
 		{
-			value += parameters[i];
+			led_r = r;
+			led_g = g;
+			led_b = b;
+			led_mode = mode;
+			state_changed = true;
 		}
-
-		sprintf(result, "%d", value);
-		return;
-	}
-
-	if (strcmp("subtract", command) == 0)
-	{
-		int value = 0;
-		if (parameters_count >= 1)
-		{
-			value = parameters[0];
-		}
-		for (int i = 1; i < parameters_count; i++)
-			value -= parameters[i];
-
-		sprintf(result, "%d", value);
-		return;
+		return true;
 	}
 
 	strcpy(result, "error");
+	return false;
 }
 
 static void free_memory(void)
@@ -118,7 +112,7 @@ bool parse_line(char *line, char *result)
 	while (word != NULL)
 	{
 		remove_last_rn(word);
-		ds(word, 100);
+		// ds(word, 100);
 		if (words_count + 1 >= words_max_count)
 		{
 			free_memory();
@@ -150,10 +144,10 @@ bool parse_line(char *line, char *result)
 	// for (int i = 0; i < parameters_count; i++)
 	// 	printf("%d\r\n", parameters[i]);
 
-	execute_commands(words[0], result);
+	bool ok = execute_commands(words[0], result);
 	// ds(result, 100);
 
 	free_memory();
 
-	return true;
+	return ok;
 }

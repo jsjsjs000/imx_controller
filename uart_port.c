@@ -10,19 +10,15 @@
 #include <sys/ioctl.h>
 #include <sys/time.h>
 
-static const int Timeout_MS = 50;
+static const int TIMEOUT_MS = 50;
 
+static int fuart = 0;
 static bool uart_port_set_parameters(int f);
 
-bool send_and_receive_to_uart(char *uart_port_name, const char *send, int send_count,
-		char *read_buffer, int read_buffer_size, int *read_count, bool *timeout, int *read_time_us)
+bool open_uart(char *uart_port_name)
 {
-	*read_count = 0;
-	*timeout = false;
-	*read_time_us = 0;
-
-	int f = open(uart_port_name, O_RDWR); // | O_NOCTTY
-	if (f < 0)
+	fuart = open(uart_port_name, O_RDWR); // | O_NOCTTY
+	if (fuart < 0)
 	{
 		printf("Can't open port %s\r\n", uart_port_name);
 		perror(uart_port_name);
@@ -32,35 +28,48 @@ bool send_and_receive_to_uart(char *uart_port_name, const char *send, int send_c
 		return false;
 	}
 
-	if (!uart_port_set_parameters(f))
+	if (!uart_port_set_parameters(fuart))
 	{
 		printf("Error set UART parameters.\r\n");
 		perror(uart_port_name);
-		close(f);
+		close(fuart);
 		return false;
 	}
+
+	return true;
+}
+
+void close_uart(void)
+{
+	close(fuart);
+}
+
+bool send_and_receive_to_uart(const char *send, int send_count, char *read_buffer,
+		int read_buffer_size, int *read_count, bool *timeout, int *read_time_us)
+{
+	*read_count = 0;
+	*timeout = false;
+	*read_time_us = 0;
 
 		// write to UART
 	int wrote_count = 0;
 	do
 	{
-		int wrote_count_ = write(f, &send[wrote_count], send_count);
+		int wrote_count_ = write(fuart, &send[wrote_count], send_count);
 		if (wrote_count_ < 0)
 		{
-			printf("Can't write to %s\r\n", uart_port_name);
-			perror(uart_port_name);
-			close(f);
+			printf("Can't write to UART\r\n");
+			perror(NULL);
 			return false;
 		}
 		wrote_count += wrote_count_;
 	}
 	while (wrote_count < send_count);
 	
-	if (write(f, "\r\n", 2) < 0)
+	if (write(fuart, "\r\n", 2) < 0)
 	{
-		printf("Can't write to %s\r\n", uart_port_name);
-		perror(uart_port_name);
-		close(f);
+		printf("Can't write to UART\r\n");
+		perror(NULL);
 		return false;
 	}
 
@@ -77,16 +86,14 @@ bool send_and_receive_to_uart(char *uart_port_name, const char *send, int send_c
 			// if (*read_count + read_available >= read_buffer_size)
 			// {
 			// 	printf("UART try read buffer overlow (%d bytes).\r\n", read_buffer_size);
-			// 	close(f);
 			// 	return false;
 			// }
 
-			int read_count_ = read(f, &read_buffer[*read_count], read_buffer_size - *read_count);
+			int read_count_ = read(fuart, &read_buffer[*read_count], read_buffer_size - *read_count);
 			if (read_count_ < 0)
 			{
-				printf("Can't read from %s\r\n", uart_port_name);
-				perror(uart_port_name);
-				close(f);
+				printf("Can't read from UART\r\n");
+				perror(NULL);
 				return false;
 			}
 			else if (read_count_ > 0)
@@ -95,7 +102,6 @@ bool send_and_receive_to_uart(char *uart_port_name, const char *send, int send_c
 				if (*read_count >= read_buffer_size)
 				{
 					printf("UART try read buffer overlow (%d bytes).\r\n", read_buffer_size);
-					close(f);
 					return false;
 				}
 			}
@@ -112,7 +118,7 @@ bool send_and_receive_to_uart(char *uart_port_name, const char *send, int send_c
 		gettimeofday(&end_tv, NULL);
 		*read_time_us = (end_tv.tv_sec - start_tv.tv_sec) * 1000000 +		// in microseconds
 				(end_tv.tv_usec - start_tv.tv_usec);
-		if (*read_time_us >= Timeout_MS * 1000)
+		if (*read_time_us >= TIMEOUT_MS * 1000)
 		{
 			*timeout = true;
 			break;
@@ -126,7 +132,6 @@ bool send_and_receive_to_uart(char *uart_port_name, const char *send, int send_c
 	*read_time_us = (end_tv.tv_sec - start_tv.tv_sec) * 1000000 +		// in microseconds
 			(end_tv.tv_usec - start_tv.tv_usec);
 
-	close(f);
 	return !(*timeout);
 }
 
